@@ -1,7 +1,5 @@
 # How It Works
 
-**Never worry about your skills.**
-
 For non-trivial work that needs a specialized skill, AutoSkills automatically finds and loads a relevant skill into context, so you never have to install or manage skills yourself. Skills with supporting files are staged temporarily, passed to delegated subagents by exact path, and cleaned up when the main agent and all subagents finish.
 
 ## Discovery
