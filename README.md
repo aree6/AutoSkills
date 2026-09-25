@@ -1,18 +1,59 @@
-# AutoSkills
+# How It Works
 
-AutoSkills conditionally discovers, reviews, and selectively uses reusable [Agent Skills](https://agentskills.io/specification) from [skills.sh](https://skills.sh).
+**Never worry about your skills.**
 
-It is designed for tasks that need specialized procedural knowledge not already covered by repository guidance, standard tools, or installed skills. AutoSkills does not route trivial work, treat popularity as a security guarantee, or persist third-party skills without explicit approval.
+For non-trivial work that needs a specialized skill, AutoSkills automatically finds and loads a relevant skill into context, so you never have to install or manage skills yourself. Skills with supporting files are staged temporarily, passed to delegated subagents by exact path, and cleaned up when the main agent and all subagents finish.
 
-## Requirements
+## Discovery
+
+The first pass is intentionally metadata-only. AutoSkills preserves skills.sh semantic result order and returns only an opaque id, title, and description for each credible candidate.
+
+The main agent chooses from those descriptions or makes a more focused query. It does not load every candidate's full `SKILL.md` merely to decide which one fits.
+
+## Review
+
+Only the chosen candidate is fully reviewed and staged. AutoSkills returns:
+
+- the exact skill name and catalog id;
+- an absolute `SKILL.md` path;
+- a SHA-256 digest of the reviewed instructions;
+- the supporting-file path when the skill has additional files;
+- a short delegation handoff containing the approved skill and safety rules.
+
+The skill path is authoritative. Prompt text and third-party output markers are never used as the path or cleanup authority.
+
+## Subagent Handoff
+
+When the main agent delegates work, it includes:
+
+- repository root, working directory, branch, and revision when available;
+- the delegated objective, relevant files, constraints, and expected result;
+- the exact approved skill names and local `SKILL.md` paths;
+- the reviewed instruction digests.
+
+A subagent must read the exact approved path, use only skills from that approved set, and begin work immediately. It must not invoke AutoSkills, repeat discovery, review or install another skill, substitute a different skill, clean temporary files, or continue rediscovering when a path is unavailable.
+
+The approved set may contain one or more skills. AutoSkills does not impose a quantity; the main agent decides what belongs in the handoff.
+
+## Temporary File Lifecycle
+
+AutoSkills creates a controlled `autoskills-review-*` directory for every full review. The main agent owns cleanup:
+
+1. Rejected reviews are cleaned immediately.
+2. Selected reviews remain available while the main agent and every delegated consumer are active.
+3. Subagents never clean or modify the staged directory.
+4. After every consumer finishes, the main agent runs the cleanup command.
+5. Cleanup moves the generated directory to macOS Trash and is safe to repeat.
+
+## Installation
+
+### Requirements
 
 - Bun 1.4.0 or newer
 - Git and network access
-- macOS with the `trash` command for self-installation and cleanup scripts
+- macOS with the `trash` command for temporary-review cleanup and self-installation
 
-The router logic is portable, but the self-install and uninstall commands currently use macOS Trash rather than permanent deletion.
-
-## Install
+Install for OpenCode:
 
 ```bash
 git clone https://github.com/aree6/AutoSkills.git
@@ -31,15 +72,17 @@ Verify OpenCode discovery with:
 opencode debug skill
 ```
 
-## How It Works
+## Commands
 
-1. The agent checks whether local guidance or an installed skill already covers the task.
-2. When the task needs a specialized workflow, AutoSkills derives up to four compact search queries.
-3. The CLI searches skills.sh and returns up to four candidates that pass the configured install-count floor.
-4. The agent reviews candidate instructions before selecting one.
-5. Supporting files are staged in a temporary `skills-use-*` directory and are not executed during review.
-6. The selected skill is used for the current task without installation by default.
-7. Persistence is considered only after explicit user approval and only when `persistMode` permits it.
+```bash
+bun src/cli.ts doctor
+bun src/cli.ts search "react performance"
+bun src/cli.ts review <skill-id>
+bun src/cli.ts install <review-id> <opencode|claude-code|codex>
+bun src/cli.ts cleanup <review-id>
+```
+
+`search` returns metadata-only candidates. `review` stages and identifies exactly one chosen skill without dumping its full body into the command result; read its returned `skillPath` directly. `install` uses the reviewed local snapshot, global scope, and no-overwrite checks. `cleanup` accepts only a generated review id.
 
 ## Policy
 
@@ -53,28 +96,21 @@ The default policy is intentionally conservative:
 }
 ```
 
-- `maxResults`: maximum candidates returned per search.
-- `minimumInstalls`: minimum skills.sh install count used as a popularity and ordering signal.
+- `maxResults`: maximum metadata candidates returned per search.
+- `minimumInstalls`: minimum skills.sh install count used only as an eligibility signal.
 - `persistMode`: `never` keeps third-party skills temporary; `workflow-only` allows explicitly approved persistence only when supporting files exist.
+
+Skills.sh semantic order is preserved. Install count does not override relevance.
 
 The four-query workflow limit is an agent instruction, not a CLI-enforced counter.
 
-## Commands
-
-```bash
-bun src/cli.ts doctor
-bun src/cli.ts search "react performance"
-bun src/cli.ts review <source> <skill>
-bun src/cli.ts install <source> <skill> <opencode|claude-code|codex>
-```
-
-`search` returns install-ranked catalog metadata. `review` materializes a candidate for inspection and returns its staged support path when supporting files exist. `install` uses global scope, refuses an existing destination, disables skills.sh CLI telemetry, validates the returned path and agent, and never persists markdown-only skills under `workflow-only` mode.
-
 ## Privacy and Trust
 
-AutoSkills sends compact task-derived search queries to skills.sh. Do not include secrets, private code, customer data, internal URLs, or other sensitive information in queries.
+AutoSkills sends compact task-derived search queries to skills.sh. Do not include secrets, private source code, customer data, internal URLs, or credentials in queries.
 
-Review downloads remote skill content. Skills are untrusted instructions and may include executable files; install counts and catalog presence are popularity signals, not security guarantees. Review and persistence are separate source fetches, so a mutable upstream can change between them; the installer’s ref and hash provide provenance but do not prove that the installed files match the reviewed snapshot. AutoSkills disables telemetry for its `skills` CLI subprocesses with `DISABLE_TELEMETRY=1` and `DO_NOT_TRACK=1`, but source and skill content are still fetched from their original hosts.
+The public skills.sh search endpoint does not return descriptions, so AutoSkills reads the public skill page's structured metadata for the short candidate list. The model receives only title and description, not the rendered skill body. Full instructions are fetched only after selection.
+
+Skills are untrusted instructions and may include executable files. Install counts and catalog presence are popularity signals, not security guarantees. AutoSkills disables telemetry for its `skills` CLI subprocesses with `DISABLE_TELEMETRY=1` and `DO_NOT_TRACK=1`, while source hosts and skills.sh still receive the requests required to search and review.
 
 ## Uninstall
 
@@ -107,7 +143,7 @@ bun run check
 bun run benchmark
 ```
 
-The benchmark measures catalog coverage, reference recall, top-reference rate, and result counts. It does not measure task success or prove that a skill is safe.
+The benchmark measures metadata coverage, reference recall, top-reference rate, description enrichment, and result counts. It does not prove task success or skill safety.
 
 ## License
 

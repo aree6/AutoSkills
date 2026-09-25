@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import {
-  extractSupportPath,
+  extractJsonLdMetadata,
   installArgs,
   parseCatalogSkill,
   parseControls,
   parseInstallResult,
+  parseSkillId,
   persistenceBlock,
   rankSkills,
   type CatalogSkill,
@@ -19,7 +20,7 @@ const controls = parseControls({
 function skill(id: string, installs: number): CatalogSkill {
   return {
     id,
-    source: id.split("/").slice(0, 2).join("/"),
+    source: id.split("/").slice(0, -1).join("/"),
     skillId: id.split("/").at(-1)!,
     name: id.split("/").at(-1)!,
     installs,
@@ -46,71 +47,88 @@ describe("router controls", () => {
   });
 });
 
-describe("catalog ranking", () => {
-  test("filters by installs, sorts descending, and caps results", () => {
+describe("catalog discovery", () => {
+  test("filters by installs without overriding semantic order", () => {
     const ranked = rankSkills(
       [
-        skill("community/one", 9_999),
-        skill("owner/two", 10_000),
-        skill("owner/three", 50_000),
-        skill("owner/four", 20_000),
-        skill("owner/five", 15_000),
-        skill("owner/six", 12_000),
+        skill("owner/first", 15_000),
+        skill("community/too-small", 9_999),
+        skill("owner/second", 500_000),
+        skill("owner/third", 20_000),
       ],
       controls,
     );
     expect(ranked.map((item) => item.id)).toEqual([
-      "owner/three",
-      "owner/four",
-      "owner/five",
-      "owner/six",
+      "owner/first",
+      "owner/second",
+      "owner/third",
     ]);
-    expect(ranked[0]?.rank).toBe(1);
+    expect(ranked.map((item) => item.rank)).toEqual([1, 2, 3]);
   });
 
-  test("keeps non-official catalog sources because no owner filter is applied", () => {
-    const source = skill("community.example/skill", 20_000);
-    const ranked = rankSkills([source], controls);
-    expect(ranked[0]?.source).toBe("community.example/skill");
+  test("extracts only title and description from JSON-LD", () => {
+    const html = `
+      <script type="application/ld+json">${JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        name: "ignore",
+      })}</script>
+      <script type="application/ld+json">${JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        name: "Research",
+        description: "Investigate against primary sources.",
+      })}</script>
+    `;
+    expect(extractJsonLdMetadata(html, "fallback")).toEqual({
+      title: "Research",
+      description: "Investigate against primary sources.",
+    });
   });
 
-  test("uses catalog order for equal install counts", () => {
-    const ranked = rankSkills(
-      [skill("owner/first", 10_000), skill("owner/second", 10_000)],
-      controls,
-    );
-    expect(ranked.map((item) => item.skillId)).toEqual(["first", "second"]);
+  test("rejects incomplete JSON-LD metadata", () => {
+    const html = `<script type="application/ld+json">${JSON.stringify({
+      "@type": "SoftwareApplication",
+      name: "No description",
+    })}</script>`;
+    expect(extractJsonLdMetadata(html, "fallback")).toBeNull();
+  });
+
+  test("parses stable skill ids", () => {
+    expect(parseSkillId("mattpocock/skills/research")).toEqual({
+      source: "mattpocock/skills",
+      skill: "research",
+      normalized: "mattpocock/skills/research",
+    });
+  });
+
+  test("parses optional catalog descriptions and defaults missing installs", () => {
+    const parsed = parseCatalogSkill({
+      id: "owner/repo/skill",
+      source: "owner/repo",
+      skillId: "skill",
+      name: "Skill",
+      installs: 12_345,
+      description: "A useful workflow",
+    });
+    expect(parsed.description).toBe("A useful workflow");
+    expect(parsed.installs).toBe(12_345);
   });
 });
 
-test("parses optional catalog descriptions and defaults missing installs", () => {
-  const parsed = parseCatalogSkill({
-    id: "owner/repo/skill",
-    source: "owner/repo",
-    skillId: "skill",
-    name: "Skill",
-    installs: 12_345,
-    description: "A useful workflow",
-  });
-  expect(parsed.description).toBe("A useful workflow");
-  expect(parsed.installs).toBe(12_345);
-});
-
-test("uses the final support marker", () => {
-  const output = [
-    "Supporting files for this skill were downloaded to:",
-    "/tmp/not-a-skill-use-directory",
-    "Supporting files for this skill were downloaded to:",
-    "/tmp/skills-use-123/example",
-  ].join("\n");
-  expect(extractSupportPath(output)).toBe("/tmp/skills-use-123/example");
-});
-
-test("installs selected skills globally", () => {
-  expect(installArgs("owner/repo", "example", "opencode")).toEqual([
+test("installs the reviewed local snapshot globally", () => {
+  expect(
+    installArgs(
+      "/tmp/autoskills-review-a/skills-use-b/research",
+      "research",
+      "opencode",
+    ),
+  ).toEqual([
     "skills@1.7.0",
     "add",
-    "owner/repo@example",
+    "/tmp/autoskills-review-a/skills-use-b/research",
+    "--skill",
+    "research",
     "--global",
     "--agent",
     "opencode",
@@ -126,30 +144,30 @@ test("parses and validates the global installer result", () => {
       {
         name: "example",
         status: "installed",
-        source: "owner/repo",
-        ref: "abc123",
+        source: "/tmp/review/example",
+        ref: null,
         hash: "hash",
         path: "/tmp/example",
         scope: "global",
-        agents: ["opencode"],
+        agents: ["OpenCode"],
         mode: "copy",
       },
     ]),
   );
   expect(parsed.scope).toBe("global");
-  expect(parsed.agents).toEqual(["opencode"]);
+  expect(parsed.agents).toEqual(["OpenCode"]);
   expect(() =>
     parseInstallResult(
       JSON.stringify([
         {
           name: "example",
           status: "installed",
-          source: "owner/repo",
+          source: "/tmp/review/example",
           ref: null,
           hash: null,
           path: "/tmp/example",
           scope: "project",
-          agents: ["opencode"],
+          agents: ["OpenCode"],
           mode: "copy",
         },
       ]),

@@ -1,8 +1,8 @@
 {
   "name": "autoskills",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
-  "description": "Conditionally discovers and reviews Agent Skills from skills.sh for tasks not covered by local guidance.",
+  "description": "Automatically discover and use the right Agent Skill for non-trivial work without installing or managing skills yourself.",
   "license": "MIT",
   "type": "module",
   "packageManager": "bun@1.4.0",

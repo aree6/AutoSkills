@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { evaluateCase, summarize } from "../scripts/benchmark";
-import type { RankedSkill } from "../src/cli";
+import type { DiscoveryCandidate } from "../src/cli";
 
 const testCase = {
   id: "testing",
@@ -9,27 +9,23 @@ const testCase = {
   referenceAny: ["owner/repository/testing"],
 };
 
-const candidates: RankedSkill[] = [
+const candidates: DiscoveryCandidate[] = [
   {
     id: "owner/repository/testing",
-    source: "owner/repository",
-    skillId: "testing",
-    name: "testing",
-    installs: 20_000,
-    rank: 1,
+    title: "Testing",
+    description: "Test software reliably.",
   },
   {
     id: "owner/repository/other",
-    source: "owner/repository",
-    skillId: "other",
-    name: "other",
-    installs: 15_000,
-    rank: 2,
+    title: "Other",
+    description: "Another workflow.",
   },
 ];
 
-test("benchmark measures install-ranked catalog coverage", () => {
-  const metric = evaluateCase(testCase, [{ rawCount: 2, candidates }]);
+test("benchmark measures semantic metadata coverage", () => {
+  const metric = evaluateCase(testCase, [
+    { rawCount: 2, omittedWithoutDescription: 0, candidates },
+  ]);
   expect(metric.resultCount).toBe(2);
   expect(metric.referenceFound).toBe(true);
   expect(metric.topReference).toBe(true);
@@ -38,13 +34,20 @@ test("benchmark measures install-ranked catalog coverage", () => {
     referenceRecall: 1,
     topReferenceRate: 1,
     resultCount: 2,
+    omittedWithoutDescription: 0,
   });
 });
 
 test("benchmark excludes cases without references from reference recall", () => {
   const metric = evaluateCase(
     { ...testCase, id: "architecture", referenceAny: [] },
-    [{ rawCount: 1, candidates: [candidates[0]!] }],
+    [
+      {
+        rawCount: 1,
+        omittedWithoutDescription: 0,
+        candidates: [candidates[0]!],
+      },
+    ],
   );
   expect(summarize([metric]).referenceRecall).toBe(0);
 });

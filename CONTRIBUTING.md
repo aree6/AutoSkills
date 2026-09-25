@@ -2,8 +2,20 @@
 
 Use Bun 1.4.0 or newer and run `bun run check` before opening a pull request.
 
-Keep the router small. The user-facing configuration must remain limited to the three controls in `config/policy.json`. Add tests for install-count filtering, descending ordering, top-N behavior, support-path validation, global installer arguments, installer result validation, and persistence semantics.
+Keep the router small. The user-facing configuration must remain limited to the three controls in `config/policy.json`.
 
-Run `bun run benchmark` after changing search behavior or workflow cases. Do not add trust, audit, star, age, or publisher-verification filters without an explicit product decision.
+Add tests for:
 
-Never commit `.agents/`, `.claude/`, `.codex/`, `skills-lock.json`, credentials, or local review staging output.
+- metadata-only candidate output and description enrichment;
+- preservation of skills.sh semantic order;
+- install-count eligibility without popularity re-ranking;
+- exact staging paths for markdown-only and multi-file skills;
+- rejection of forged markers, symlinks, and unexpected review layouts;
+- handoff path and digest identity;
+- cleanup containment, traversal rejection, idempotence, and Trash-only removal;
+- installation from the reviewed local snapshot;
+- main-agent cleanup only after delegated consumers finish.
+
+Run `bun run benchmark` after changing discovery behavior or workflow cases. Do not add trust, audit, star, age, or publisher-verification filters without an explicit product decision.
+
+Never commit `.agents/`, `.claude/`, `.codex/`, `skills-lock.json`, credentials, temporary review directories, or local review staging output.

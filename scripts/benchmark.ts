@@ -1,4 +1,4 @@
-import { loadControls, search, type RankedSkill } from "../src/cli";
+import { loadControls, search, type DiscoveryCandidate } from "../src/cli";
 
 type BenchmarkCase = {
   id: string;
@@ -12,7 +12,7 @@ type CaseMetric = {
   workflow: string;
   rawCount: number;
   resultCount: number;
-  minimumResultInstalls: number | null;
+  omittedWithoutDescription: number;
   topCandidate: string | null;
   topReference: boolean;
   referenceExpected: boolean;
@@ -30,8 +30,9 @@ function record(value: unknown, label: string): Record<string, unknown> {
 }
 
 function stringValue(value: unknown, label: string): string {
-  if (typeof value !== "string" || value.length === 0)
+  if (typeof value !== "string" || value.length === 0) {
     throw new Error(`Invalid ${label}`);
+  }
   return value;
 }
 
@@ -42,8 +43,9 @@ function stringArray(value: unknown, label: string): string[] {
 
 async function loadCases(): Promise<BenchmarkCase[]> {
   const value = record(await Bun.file(configPath).json(), "benchmark config");
-  if (value.schemaVersion !== 1 || !Array.isArray(value.cases))
+  if (value.schemaVersion !== 1 || !Array.isArray(value.cases)) {
     throw new Error("Invalid benchmark schema");
+  }
   return value.cases.map((item) => {
     const entry = record(item, "benchmark case");
     return {
@@ -55,21 +57,29 @@ async function loadCases(): Promise<BenchmarkCase[]> {
   });
 }
 
-function mergeResults(results: RankedSkill[][]): RankedSkill[] {
-  const byId = new Map<string, RankedSkill>();
+function mergeCandidates(
+  results: DiscoveryCandidate[][],
+): DiscoveryCandidate[] {
+  const byId = new Map<string, DiscoveryCandidate>();
   for (const result of results) {
-    for (const skill of result) byId.set(skill.id, skill);
+    for (const candidate of result) {
+      if (!byId.has(candidate.id)) byId.set(candidate.id, candidate);
+    }
   }
-  return [...byId.values()].sort(
-    (a, b) => a.rank - b.rank || b.installs - a.installs,
-  );
+  return [...byId.values()];
 }
 
 export function evaluateCase(
   testCase: BenchmarkCase,
-  results: Array<{ rawCount: number; candidates: RankedSkill[] }>,
+  results: Array<{
+    rawCount: number;
+    omittedWithoutDescription: number;
+    candidates: DiscoveryCandidate[];
+  }>,
 ): CaseMetric {
-  const candidates = mergeResults(results.map((result) => result.candidates));
+  const candidates = mergeCandidates(
+    results.map((result) => result.candidates),
+  );
   const referenceSet = new Set(testCase.referenceAny);
   const topCandidate = candidates[0]?.id ?? null;
   return {
@@ -77,10 +87,10 @@ export function evaluateCase(
     workflow: testCase.workflow,
     rawCount: results.reduce((total, result) => total + result.rawCount, 0),
     resultCount: candidates.length,
-    minimumResultInstalls:
-      candidates.length > 0
-        ? Math.min(...candidates.map((skill) => skill.installs))
-        : null,
+    omittedWithoutDescription: results.reduce(
+      (total, result) => total + result.omittedWithoutDescription,
+      0,
+    ),
     topCandidate,
     topReference: topCandidate !== null && referenceSet.has(topCandidate),
     referenceExpected: testCase.referenceAny.length > 0,
@@ -103,6 +113,10 @@ export function summarize(cases: CaseMetric[]) {
     topReferenceRate:
       referenceCases.length === 0 ? 0 : topReference / referenceCases.length,
     resultCount: cases.reduce((total, item) => total + item.resultCount, 0),
+    omittedWithoutDescription: cases.reduce(
+      (total, item) => total + item.omittedWithoutDescription,
+      0,
+    ),
   };
 }
 
@@ -130,7 +144,10 @@ async function main(): Promise<void> {
         generatedAt: new Date().toISOString(),
         controls,
         caseCount: cases.length,
-        queryCount: new Set(cases.flatMap((item) => item.queries)).size,
+        queryCount: cases.reduce(
+          (total, item) => total + item.queries.length,
+          0,
+        ),
         errors,
         summary: summarize(metrics),
         cases: metrics,
