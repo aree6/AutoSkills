@@ -1,10 +1,36 @@
-import { afterEach, expect, test } from "bun:test";
-import { lstat, mkdir, mkdtemp, symlink, writeFile } from "node:fs/promises";
+import { afterAll, afterEach, expect, test } from "bun:test";
+import {
+  chmod,
+  lstat,
+  mkdir,
+  mkdtemp,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { cleanupReview, discoverMaterializedSkill } from "../src/cli";
 
 const temporaryPaths: string[] = [];
+const testBin = await mkdtemp(join(tmpdir(), "autoskills-test-bin-"));
+const testTrash = await mkdtemp(join(tmpdir(), "autoskills-test-trash-"));
+const originalPath = process.env.PATH;
+const originalTestTrash = process.env.AUTOSKILLS_TEST_TRASH;
+const trashShim = join(testBin, "trash");
+await writeFile(
+  trashShim,
+  '#!/bin/sh\nset -eu\nmv "$1" "$AUTOSKILLS_TEST_TRASH/"\n',
+);
+await chmod(trashShim, 0o755);
+process.env.PATH = `${testBin}:${originalPath ?? ""}`;
+process.env.AUTOSKILLS_TEST_TRASH = testTrash;
+
+afterAll(() => {
+  if (originalPath === undefined) delete process.env.PATH;
+  else process.env.PATH = originalPath;
+  if (originalTestTrash === undefined) delete process.env.AUTOSKILLS_TEST_TRASH;
+  else process.env.AUTOSKILLS_TEST_TRASH = originalTestTrash;
+});
 
 async function createReview(
   skillName: string,
