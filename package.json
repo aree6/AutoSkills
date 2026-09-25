@@ -1,0 +1,40 @@
+{
+  "name": "autoskills",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Conditionally discovers and reviews Agent Skills from skills.sh for tasks not covered by local guidance.",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "bun@1.4.0",
+  "engines": {
+    "bun": ">=1.4.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aree6/AutoSkills.git"
+  },
+  "bugs": {
+    "url": "https://github.com/aree6/AutoSkills/issues"
+  },
+  "homepage": "https://github.com/aree6/AutoSkills#readme",
+  "author": "aree6",
+  "scripts": {
+    "check": "bun run format:check && bun run typecheck && bun test",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "benchmark": "bun scripts/benchmark.ts",
+    "install:opencode": "bun scripts/install-self.ts opencode",
+    "install:claude": "bun scripts/install-self.ts claude-code",
+    "install:codex": "bun scripts/install-self.ts codex",
+    "uninstall:opencode": "bun scripts/uninstall-self.ts opencode",
+    "uninstall:claude": "bun scripts/uninstall-self.ts claude-code",
+    "uninstall:codex": "bun scripts/uninstall-self.ts codex"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.2",
+    "prettier": "3.9.9",
+    "skills": "1.7.0",
+    "typescript": "7.0.2"
+  }
+}

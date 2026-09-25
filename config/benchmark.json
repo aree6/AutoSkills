@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "frontend-performance",
+      "workflow": "frontend",
+      "queries": ["react performance"],
+      "referenceAny": ["vercel-labs/agent-skills/vercel-react-best-practices"]
+    },
+    {
+      "id": "frontend-design",
+      "workflow": "frontend",
+      "queries": ["web design"],
+      "referenceAny": [
+        "vercel-labs/agent-skills/web-design-guidelines",
+        "anthropics/skills/frontend-design"
+      ]
+    },
+    {
+      "id": "security-review",
+      "workflow": "security",
+      "queries": ["security code review"],
+      "referenceAny": [
+        "openai/skills/security-threat-model",
+        "github/awesome-copilot/security-review",
+        "anthropics/knowledge-work-plugins/code-review"
+      ]
+    },
+    {
+      "id": "testing-debugging",
+      "workflow": "testing",
+      "queries": ["jest playwright"],
+      "referenceAny": [
+        "github/awesome-copilot/webapp-testing",
+        "anthropics/skills/webapp-testing"
+      ]
+    },
+    {
+      "id": "technical-documentation",
+      "workflow": "documentation",
+      "queries": ["technical writing"],
+      "referenceAny": [
+        "anthropics/skills/doc-coauthoring",
+        "github/awesome-copilot/documentation-writer",
+        "anthropics/knowledge-work-plugins/documentation"
+      ]
+    },
+    {
+      "id": "deployment-operations",
+      "workflow": "operations",
+      "queries": ["production deployment"],
+      "referenceAny": ["microsoft/azure-skills/azure-deploy"]
+    },
+    {
+      "id": "web-research",
+      "workflow": "research",
+      "queries": ["web search research"],
+      "referenceAny": [
+        "firecrawl/cli/firecrawl-search",
+        "tavily-ai/skills/tavily-best-practices",
+        "parallel-web/parallel-agent-skills/parallel-deep-research"
+      ]
+    },
+    {
+      "id": "typescript-testing",
+      "workflow": "testing",
+      "queries": ["javascript typescript jest"],
+      "referenceAny": [
+        "github/awesome-copilot/javascript-typescript-jest",
+        "github/awesome-copilot/polyglot-test-agent"
+      ]
+    },
+    {
+      "id": "code-review",
+      "workflow": "review",
+      "queries": ["pull request code review", "code review"],
+      "referenceAny": [
+        "anthropics/knowledge-work-plugins/code-review",
+        "coderabbitai/skills/code-review",
+        "getsentry/skills/code-review"
+      ]
+    },
+    {
+      "id": "api-backend",
+      "workflow": "backend",
+      "queries": ["backend API"],
+      "referenceAny": [
+        "clerk/skills/clerk-backend-api",
+        "microsoft/azure-skills/azure-aigateway",
+        "medusajs/medusa-agent-skills/building-with-medusa"
+      ]
+    },
+    {
+      "id": "architecture",
+      "workflow": "architecture",
+      "queries": ["codebase architecture", "system design"],
+      "referenceAny": []
+    }
+  ]
+}
