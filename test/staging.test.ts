@@ -64,11 +64,11 @@ async function exists(path: string): Promise<boolean> {
 afterEach(async () => {
   for (const path of temporaryPaths.splice(0)) {
     if (!(await exists(path))) continue;
-    const child = Bun.spawn(["trash", path], {
-      stdout: "ignore",
-      stderr: "ignore",
+    const reviewId = materializedId(path);
+    await expect(cleanupReview(reviewId)).resolves.toEqual({
+      reviewId,
+      cleaned: true,
     });
-    expect(await child.exited).toBe(0);
   }
 });
 
