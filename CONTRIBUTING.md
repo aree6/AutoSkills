@@ -12,9 +12,9 @@ Add tests for:
 - exact staging paths for markdown-only and multi-file skills;
 - rejection of forged markers, symlinks, and unexpected review layouts;
 - handoff path and digest identity;
-- cleanup containment, traversal rejection, idempotence, and Trash-only removal;
+- temporary-review containment, traversal rejection, and explicit maintenance behavior;
 - installation from the reviewed local snapshot;
-- main-agent cleanup only after delegated consumers finish.
+- local temporary retention and reuse across task continuations.
 
 Run `bun run benchmark` after changing discovery behavior or workflow cases. Do not add trust, audit, star, age, or publisher-verification filters without an explicit product decision.
 

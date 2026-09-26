@@ -2,9 +2,9 @@
 
 ## Components
 
-- `SKILL.md` defines metadata-first discovery, selective review, delegation handoff, and cleanup rules.
-- `src/cli.ts` searches skills.sh, enriches public page metadata, stages selected reviews, optionally persists approved snapshots, and cleans temporary reviews.
-- `config/policy.json` contains the three user-facing controls.
+- `SKILL.md` defines metadata-first discovery, selective review, delegation handoff, and local temporary-storage rules.
+- `src/cli.ts` searches skills.sh, enriches public page metadata, loads selected reviews locally in OS temporary storage, and optionally persists approved snapshots.
+- `config/policy.json` contains the two user-facing controls.
 - `config/benchmark.json` contains catalog queries and reference candidates.
 - `scripts/benchmark.ts` measures metadata discovery and semantic ordering.
 - `scripts/install-self.ts` installs or updates the router skill.
@@ -13,12 +13,12 @@
 ## Discovery Flow
 
 1. Check repository guidance, standard tools, and installed skills before searching.
-2. Search up to four compact queries sequentially when the task needs a specialized workflow.
+2. Search up to four compact queries, issued as at most two parallel pairs, when the task needs a specialized workflow.
 3. Preserve skills.sh semantic result order.
-4. Apply `minimumInstalls` as an eligibility filter without re-sorting.
+4. Truncate the semantic result order to `maxResults` without re-sorting.
 5. Read public JSON-LD metadata for the short candidate list.
 6. Return only an opaque id, title, and description.
-7. Select from metadata or make a more focused query.
+7. Select from the union of both queries, deduplicating ids, or run one more pair.
 8. Do not materialize or review the full skill until a candidate is chosen.
 
 The authenticated v1 API is not used because it requires Vercel OIDC. AutoSkills uses the existing public search endpoint and public skill-page JSON-LD so local metadata enrichment remains credential-free.
@@ -31,21 +31,20 @@ The authenticated v1 API is not used because it requires Vercel OIDC. AutoSkills
 4. Require exactly one generated `skills-use-*` directory and one materialized skill directory.
 5. Validate the exact `SKILL.md`, reject symlinks and unexpected layouts, and calculate its SHA-256 digest.
 6. Return the review id, exact instruction path, digest, support files, and handoff metadata.
-7. Keep the full body out of the review command result; the main agent reads the exact path after selection.
+7. Keep the full body out of the review command result; the main agent reads the exact local path and reuses it across continuations.
 
 ## Delegation Flow
 
-The main agent adds repository and task context to the review's approved-skill handoff. A subagent must read the exact approved path and use only the listed skills. Subagents cannot invoke AutoSkills, repeat discovery, substitute skills, modify staged files, or clean the review.
+The main agent adds repository and task context to the review's approved-skill handoff. A subagent must read the exact approved path and use only the listed skills. Subagents cannot invoke AutoSkills, repeat discovery, substitute skills, or modify local temporary files.
 
 The approved set may contain one or more skills. AutoSkills does not impose a quantity.
 
-## Temporary Lifecycle
+## Local Temporary Storage
 
-- The main agent owns cleanup.
-- Rejected reviews are cleaned immediately.
-- Selected reviews remain until all consumers are terminal.
-- Cleanup accepts only a generated `autoskills-review-*` id that resolves directly beneath the OS temporary root.
-- Cleanup moves the exact directory to Trash and never uses permanent deletion.
+- Selected reviews are loaded beneath the canonical OS temporary root.
+- The main agent and approved subagents retain the exact path and digest across turns and continuations.
+- Local temporary storage is not global installation; the OS owns its eventual lifecycle.
+- Rejected or failed materialization is never used as an approved skill.
 
 ## Persistence Flow
 
@@ -53,21 +52,19 @@ Persistence remains disabled by default. When explicitly enabled and approved, i
 
 ## Controls
 
-| Control           | Role                                                                   |
-| ----------------- | ---------------------------------------------------------------------- |
-| `maxResults`      | Maximum metadata candidates returned per query                         |
-| `minimumInstalls` | Install-count eligibility floor, not a relevance score                 |
-| `persistMode`     | Whether explicitly approved supporting-file workflows may be persisted |
+| Control       | Role                                                                   |
+| ------------- | ---------------------------------------------------------------------- |
+| `maxResults`  | Maximum metadata candidates returned per query                         |
+| `persistMode` | Whether explicitly approved supporting-file workflows may be persisted |
 
-The agent workflow permits up to four sequential queries. The CLI does not maintain a task-scoped query counter.
+The agent workflow permits up to four queries, issued as at most two parallel pairs of two. The CLI does not maintain a task-scoped query counter.
 
 ## Failure Semantics
 
 - Missing title or description metadata: omit the candidate.
 - No credible metadata candidate: refine the query.
-- Unexpected review layout or symlink: fail closed and clean the review.
-- Invalid review id or escaped path: refuse cleanup.
-- Missing review directory: cleanup succeeds idempotently.
+- Unexpected review layout or symlink: fail closed and do not approve the materialization.
+- Missing local review path: report stale state rather than silently selecting a replacement.
 - `persistMode: never`: return without persistence.
 - Markdown-only skill under `workflow-only`: return without persistence.
 - Existing installation destination: do not overwrite.

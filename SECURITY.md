@@ -14,13 +14,13 @@ Full skill content is fetched only after metadata selection. AutoSkills sets `DI
 
 ## Delegation
 
-The main agent provides the exact reviewed skill paths, digests, repository context, and approved-skill set. Subagents must treat staged files as read-only, use no unapproved skills, never repeat discovery, and never clean the review.
+The main agent provides the exact reviewed skill paths, digests, repository context, and approved-skill set. Subagents must treat local temporary files as read-only, use no unapproved skills, never repeat discovery, and keep the reviewed files available for task continuation.
 
 A missing path or changed digest is a stop condition. The subagent must report the failure rather than searching for a replacement.
 
-## Temporary Reviews
+## Local Temporary Reviews
 
-Every full review is staged beneath a generated `autoskills-review-*` directory under the OS temporary root. Only the main agent may clean it, and only after all consumers are terminal. Cleanup validates the generated id and exact directory, then moves it to macOS Trash without a permanent-deletion fallback.
+Every full review is loaded beneath a generated `autoskills-review-*` directory under the OS temporary root. The main agent and approved subagents use the exact local path and digest, and retain the snapshot for the logical task across turns and continuations. This is local temporary storage, not global installation.
 
 ## Persistence
 

@@ -1,6 +1,6 @@
 {
   "name": "autoskills",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "description": "Automatically discover and use the right Agent Skill for non-trivial work without installing or managing skills yourself.",
   "license": "MIT",

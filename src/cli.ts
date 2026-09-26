@@ -13,7 +13,6 @@ import { fileURLToPath } from "node:url";
 
 export type Controls = {
   maxResults: number;
-  minimumInstalls: number;
   persistMode: "never" | "workflow-only";
 };
 
@@ -80,7 +79,7 @@ export type Review = {
   supportPath: string | null;
   files: string[];
   hasWorkflowFiles: boolean;
-  cleanupOwner: "main-agent";
+  storage: "os-temp";
   handoff: {
     approvedSkills: Array<{
       id: string;
@@ -139,7 +138,7 @@ function normalizedText(value: string): string {
 
 export function parseControls(value: unknown): Controls {
   const item = record(value, "router controls");
-  const allowed = new Set(["maxResults", "minimumInstalls", "persistMode"]);
+  const allowed = new Set(["maxResults", "persistMode"]);
   if (Object.keys(item).some((key) => !allowed.has(key))) {
     throw new Error("Unknown router control");
   }
@@ -149,7 +148,6 @@ export function parseControls(value: unknown): Controls {
   }
   const controls: Controls = {
     maxResults: integerValue(item.maxResults, "maxResults"),
-    minimumInstalls: integerValue(item.minimumInstalls, "minimumInstalls"),
     persistMode,
   };
   if (controls.maxResults === 0) {
@@ -202,7 +200,6 @@ export function rankSkills(
   controls: Controls,
 ): RankedSkill[] {
   return skills
-    .filter((skill) => skill.installs >= controls.minimumInstalls)
     .slice(0, controls.maxResults)
     .map((skill, index) => ({ ...skill, rank: index + 1 }));
 }
@@ -541,7 +538,7 @@ async function useSkill(id: string): Promise<Review> {
     supportPath: supportFiles.length > 0 ? materialized.skillDir : null,
     files: materialized.files,
     hasWorkflowFiles: materialized.hasWorkflowFiles,
-    cleanupOwner: "main-agent",
+    storage: "os-temp",
     handoff: {
       approvedSkills: [
         {
@@ -553,10 +550,11 @@ async function useSkill(id: string): Promise<Review> {
       ],
       rules: [
         "Read each exact approved instructionsPath before starting work.",
+        "Keep the reviewed local temporary files available for the rest of the task.",
         "Use only skills listed in approvedSkills.",
         "Do not invoke AutoSkills or repeat discovery, search, review, or installation.",
         "Do not substitute an unapproved skill.",
-        "Treat staged files as read-only and do not clean them.",
+        "Treat staged files as read-only and do not modify them.",
         "If an instructionsPath is unavailable or its digest changed, stop and report instead of rediscovering.",
       ],
     },

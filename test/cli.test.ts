@@ -13,7 +13,6 @@ import {
 
 const controls = parseControls({
   maxResults: 4,
-  minimumInstalls: 10_000,
   persistMode: "never",
 });
 
@@ -28,10 +27,9 @@ function skill(id: string, installs: number): CatalogSkill {
 }
 
 describe("router controls", () => {
-  test("keeps the three-control contract", () => {
+  test("keeps the two-control contract", () => {
     expect(controls).toEqual({
       maxResults: 4,
-      minimumInstalls: 10_000,
       persistMode: "never",
     });
   });
@@ -45,25 +43,33 @@ describe("router controls", () => {
   test("rejects unknown controls", () => {
     expect(() => parseControls({ ...controls, maxQueries: 4 })).toThrow();
   });
+
+  test("rejects the retired install-count floor", () => {
+    expect(() =>
+      parseControls({ ...controls, minimumInstalls: 10_000 }),
+    ).toThrow();
+  });
 });
 
 describe("catalog discovery", () => {
-  test("filters by installs without overriding semantic order", () => {
+  test("truncates to maxResults while preserving semantic order", () => {
     const ranked = rankSkills(
       [
+        skill("community/low-installs", 3),
         skill("owner/first", 15_000),
-        skill("community/too-small", 9_999),
         skill("owner/second", 500_000),
         skill("owner/third", 20_000),
+        skill("owner/fourth", 99),
       ],
       controls,
     );
     expect(ranked.map((item) => item.id)).toEqual([
+      "community/low-installs",
       "owner/first",
       "owner/second",
       "owner/third",
     ]);
-    expect(ranked.map((item) => item.rank)).toEqual([1, 2, 3]);
+    expect(ranked.map((item) => item.rank)).toEqual([1, 2, 3, 4]);
   });
 
   test("extracts only title and description from JSON-LD", () => {

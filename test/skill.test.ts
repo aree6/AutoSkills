@@ -20,12 +20,11 @@ test("skill requires an exact approved-skill handoff", () => {
   );
 });
 
-test("skill assigns temporary cleanup to the main agent", () => {
-  expect(skill).toContain("The main agent exclusively owns cleanup");
-  expect(skill).toContain("Subagents must never run `cleanup`");
-  expect(skill).toContain(
-    'bun "$AUTOSKILL_ROOT/src/cli.ts" cleanup "<review-id>"',
-  );
+test("skill retains reviewed skills in local temporary storage", () => {
+  expect(skill).toContain("loaded locally inside the OS temporary directory");
+  expect(skill).toContain("Reuse them after plan mode");
+  expect(skill).toContain("Keep the local review unchanged");
+  expect(skill).not.toContain("cleanup");
 });
 
 test("README starts with how it works and orders core sections", () => {

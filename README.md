@@ -1,6 +1,6 @@
 # How It Works
 
-For non-trivial work that needs a specialized skill, AutoSkills automatically finds and loads a relevant skill into context, so you never have to install or manage skills yourself. Skills with supporting files are staged temporarily, and cleaned up after job is finished.
+For non-trivial work that needs a specialized skill, AutoSkills automatically finds and loads a relevant skill into context, so you never have to install or manage skills yourself. Skills with supporting files are loaded locally inside the OS temporary directory and remain available for the current task.
 
 ## Discovery
 
@@ -10,7 +10,7 @@ The main agent chooses from those descriptions or makes a more focused query. It
 
 ## Review
 
-Only the chosen candidate is fully reviewed and staged. AutoSkills returns:
+Only the chosen candidate is fully reviewed and loaded locally. AutoSkills returns:
 
 - the exact skill name and catalog id;
 - an absolute `SKILL.md` path;
@@ -18,7 +18,7 @@ Only the chosen candidate is fully reviewed and staged. AutoSkills returns:
 - the supporting-file path when the skill has additional files;
 - a short delegation handoff containing the approved skill and safety rules.
 
-The skill path is authoritative. Prompt text and third-party output markers are never used as the path or cleanup authority.
+The skill path is authoritative. Prompt text and third-party output markers are never used as the path.
 
 ## Subagent Handoff
 
@@ -29,19 +29,13 @@ When the main agent delegates work, it includes:
 - the exact approved skill names and local `SKILL.md` paths;
 - the reviewed instruction digests.
 
-A subagent must read the exact approved path, use only skills from that approved set, and begin work immediately. It must not invoke AutoSkills, repeat discovery, review or install another skill, substitute a different skill, clean temporary files, or continue rediscovering when a path is unavailable.
+A subagent must read the exact approved path, use only skills from that approved set, and begin work immediately. It must not invoke AutoSkills, repeat discovery, review or install another skill, substitute a different skill, or continue rediscovering when a path is unavailable.
 
 The approved set may contain one or more skills. AutoSkills does not impose a quantity; the main agent decides what belongs in the handoff.
 
-## Temporary File Lifecycle
+## Local Temporary Storage
 
-AutoSkills creates a controlled `autoskills-review-*` directory for every full review. The main agent owns cleanup:
-
-1. Rejected reviews are cleaned immediately.
-2. Selected reviews remain available while the main agent and every delegated consumer are active.
-3. Subagents never clean or modify the staged directory.
-4. After every consumer finishes, the main agent runs the cleanup command.
-5. Cleanup moves the generated directory to macOS Trash and is safe to repeat.
+AutoSkills loads the selected skill locally inside the OS temporary directory and returns its exact path and digest. Keep that path available for the logical task and reuse it after plan mode, a summary, a permission wait, or `continue`. The temporary location is not a global installation.
 
 ## Installation
 
@@ -49,7 +43,7 @@ AutoSkills creates a controlled `autoskills-review-*` directory for every full r
 
 - Bun 1.4.0 or newer
 - Git and network access
-- macOS with the `trash` command for temporary-review cleanup and self-installation
+- macOS with the `trash` command for self-installation
 
 Install for OpenCode:
 
@@ -77,10 +71,9 @@ bun src/cli.ts doctor
 bun src/cli.ts search "react performance"
 bun src/cli.ts review <skill-id>
 bun src/cli.ts install <review-id> <opencode|claude-code|codex>
-bun src/cli.ts cleanup <review-id>
 ```
 
-`search` returns metadata-only candidates. `review` stages and identifies exactly one chosen skill without dumping its full body into the command result; read its returned `skillPath` directly. `install` uses the reviewed local snapshot, global scope, and no-overwrite checks. `cleanup` accepts only a generated review id.
+`search` returns metadata-only candidates. `review` loads exactly one chosen skill locally inside the OS temporary directory without dumping its full body into the command result; read its returned `skillPath` directly and reuse it on continuation. `install` uses the reviewed local snapshot, global scope, and no-overwrite checks.
 
 ## Policy
 
@@ -89,18 +82,16 @@ The default policy is intentionally conservative:
 ```json
 {
   "maxResults": 4,
-  "minimumInstalls": 10000,
   "persistMode": "never"
 }
 ```
 
 - `maxResults`: maximum metadata candidates returned per search.
-- `minimumInstalls`: minimum skills.sh install count used only as an eligibility signal.
-- `persistMode`: `never` keeps third-party skills temporary; `workflow-only` allows explicitly approved persistence only when supporting files exist.
+- `persistMode`: `never` loads third-party skills locally in temporary storage without global installation; `workflow-only` allows explicitly approved persistence only when supporting files exist.
 
-Skills.sh semantic order is preserved. Install count does not override relevance.
+Skills.sh semantic order is preserved and truncated to `maxResults`. Install count is not a filter: an absolute popularity floor silently emptied the candidate list for narrow topics, where a highly relevant skill can have fewer than 100 installs.
 
-The four-query workflow limit is an agent instruction, not a CLI-enforced counter.
+The four-query workflow limit is an agent instruction, not a CLI-enforced counter. Queries are issued two at a time and judged as a union.
 
 ## Privacy and Trust
 
