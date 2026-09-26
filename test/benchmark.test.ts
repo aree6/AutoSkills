@@ -22,9 +22,11 @@ const candidates: DiscoveryCandidate[] = [
   },
 ];
 
+const noOmissions = { unreachable: 0, incompleteMetadata: 0 };
+
 test("benchmark measures semantic metadata coverage", () => {
   const metric = evaluateCase(testCase, [
-    { rawCount: 2, omittedWithoutDescription: 0, candidates },
+    { rawCount: 2, candidates, omitted: noOmissions, diagnosis: null },
   ]);
   expect(metric.resultCount).toBe(2);
   expect(metric.referenceFound).toBe(true);
@@ -34,7 +36,8 @@ test("benchmark measures semantic metadata coverage", () => {
     referenceRecall: 1,
     topReferenceRate: 1,
     resultCount: 2,
-    omittedWithoutDescription: 0,
+    omitted: noOmissions,
+    diagnosed: 0,
   });
 });
 
@@ -44,10 +47,24 @@ test("benchmark excludes cases without references from reference recall", () => 
     [
       {
         rawCount: 1,
-        omittedWithoutDescription: 0,
         candidates: [candidates[0]!],
+        omitted: noOmissions,
+        diagnosis: null,
       },
     ],
   );
   expect(summarize([metric]).referenceRecall).toBe(0);
+});
+
+test("benchmark keeps unreachable and incomplete omissions apart", () => {
+  const metric = evaluateCase(testCase, [
+    {
+      rawCount: 5,
+      candidates: [candidates[0]!],
+      omitted: { unreachable: 2, incompleteMetadata: 1 },
+      diagnosis: "upstream metadata gap",
+    },
+  ]);
+  expect(metric.omitted).toEqual({ unreachable: 2, incompleteMetadata: 1 });
+  expect(summarize([metric]).diagnosed).toBe(1);
 });

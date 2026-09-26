@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  diagnose,
   extractJsonLdMetadata,
   installArgs,
   parseCatalogSkill,
@@ -119,6 +120,55 @@ describe("catalog discovery", () => {
     });
     expect(parsed.description).toBe("A useful workflow");
     expect(parsed.installs).toBe(12_345);
+  });
+});
+
+describe("empty-result diagnosis", () => {
+  const none = { unreachable: 0, incompleteMetadata: 0 };
+
+  test("stays silent when a candidate was returned", () => {
+    expect(diagnose(12, 4, 4, none)).toBeNull();
+  });
+
+  test("blames the query only when the catalog matched nothing", () => {
+    const message = diagnose(0, 0, 0, none);
+    expect(message).toContain("matched nothing");
+    expect(message).toContain("Only a different query can help");
+  });
+
+  test("separates an unreachable page from incomplete metadata", () => {
+    const unreachable = diagnose(4, 4, 0, {
+      unreachable: 4,
+      incompleteMetadata: 0,
+    });
+    expect(unreachable).toContain("failed to load");
+    expect(unreachable).toContain("not a query problem");
+
+    const incomplete = diagnose(4, 4, 0, {
+      unreachable: 0,
+      incompleteMetadata: 4,
+    });
+    expect(incomplete).toContain("no usable title and description");
+    expect(incomplete).toContain("upstream metadata gap");
+  });
+
+  test("never reports success for an empty candidate list", () => {
+    for (const omitted of [
+      none,
+      { unreachable: 1, incompleteMetadata: 0 },
+      { unreachable: 0, incompleteMetadata: 1 },
+      { unreachable: 1, incompleteMetadata: 1 },
+    ]) {
+      expect(diagnose(9, 4, 0, omitted)).not.toBeNull();
+    }
+  });
+
+  test("advises a single retry when only some pages failed", () => {
+    const message = diagnose(9, 4, 0, {
+      unreachable: 3,
+      incompleteMetadata: 0,
+    });
+    expect(message).toContain("Retry the same pair once");
   });
 });
 

@@ -12,7 +12,7 @@ Queries must not contain secrets, private source code, customer data, internal U
 
 Preserve skills.sh semantic result order and truncate to `maxResults`; never re-sort by popularity. Install count is not a filter, because an absolute floor discards the most relevant results for narrow topics. Enrich the short candidate list from public skill-page JSON-LD and return only an opaque id, title, and description.
 
-Candidates without both title and description are omitted. Queries are issued as pairs and judged as a union, because complementary phrasings return disjoint catalogs and a strong candidate often appears in only one of them. If no candidate is credible, run one more pair before loading any full skill.
+Candidates without both title and description are omitted and counted under `omitted.incompleteMetadata`; pages that fail to load are counted separately under `omitted.unreachable`. When no candidate survives, `search` returns a `diagnosis` naming the cause so an upstream failure is never mistaken for bad query wording. Queries are issued as pairs and judged as a union, because complementary phrasings return disjoint catalogs and a strong candidate often appears in only one of them. If no candidate is credible, run one more pair before loading any full skill.
 
 ## Review Gate
 

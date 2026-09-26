@@ -61,8 +61,10 @@ The agent workflow permits up to four queries, issued as at most two parallel pa
 
 ## Failure Semantics
 
-- Missing title or description metadata: omit the candidate.
-- No credible metadata candidate: refine the query.
+- Missing title or description metadata: omit the candidate and count it under `omitted.incompleteMetadata`.
+- Candidate page that fails to load: omit the candidate and count it under `omitted.unreachable`. Failures are never collapsed into the incomplete-metadata count.
+- No candidate after inspection: return a `diagnosis` naming the cause. An empty `candidates` list is never reported as a clean run, so a query is not blamed for an upstream failure.
+- No credible metadata candidate: run the next query pair.
 - Unexpected review layout or symlink: fail closed and do not approve the materialization.
 - Missing local review path: report stale state rather than silently selecting a replacement.
 - `persistMode: never`: return without persistence.

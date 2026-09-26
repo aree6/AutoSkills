@@ -1,4 +1,9 @@
-import { loadControls, search, type DiscoveryCandidate } from "../src/cli";
+import {
+  loadControls,
+  search,
+  type DiscoveryCandidate,
+  type Omission,
+} from "../src/cli";
 
 type BenchmarkCase = {
   id: string;
@@ -12,7 +17,8 @@ type CaseMetric = {
   workflow: string;
   rawCount: number;
   resultCount: number;
-  omittedWithoutDescription: number;
+  omitted: Omission;
+  diagnosed: number;
   topCandidate: string | null;
   topReference: boolean;
   referenceExpected: boolean;
@@ -73,8 +79,9 @@ export function evaluateCase(
   testCase: BenchmarkCase,
   results: Array<{
     rawCount: number;
-    omittedWithoutDescription: number;
     candidates: DiscoveryCandidate[];
+    omitted: Omission;
+    diagnosis: string | null;
   }>,
 ): CaseMetric {
   const candidates = mergeCandidates(
@@ -87,10 +94,17 @@ export function evaluateCase(
     workflow: testCase.workflow,
     rawCount: results.reduce((total, result) => total + result.rawCount, 0),
     resultCount: candidates.length,
-    omittedWithoutDescription: results.reduce(
-      (total, result) => total + result.omittedWithoutDescription,
-      0,
-    ),
+    omitted: {
+      unreachable: results.reduce(
+        (total, result) => total + result.omitted.unreachable,
+        0,
+      ),
+      incompleteMetadata: results.reduce(
+        (total, result) => total + result.omitted.incompleteMetadata,
+        0,
+      ),
+    },
+    diagnosed: results.filter((result) => result.diagnosis !== null).length,
     topCandidate,
     topReference: topCandidate !== null && referenceSet.has(topCandidate),
     referenceExpected: testCase.referenceAny.length > 0,
@@ -113,10 +127,17 @@ export function summarize(cases: CaseMetric[]) {
     topReferenceRate:
       referenceCases.length === 0 ? 0 : topReference / referenceCases.length,
     resultCount: cases.reduce((total, item) => total + item.resultCount, 0),
-    omittedWithoutDescription: cases.reduce(
-      (total, item) => total + item.omittedWithoutDescription,
-      0,
-    ),
+    omitted: {
+      unreachable: cases.reduce(
+        (total, item) => total + item.omitted.unreachable,
+        0,
+      ),
+      incompleteMetadata: cases.reduce(
+        (total, item) => total + item.omitted.incompleteMetadata,
+        0,
+      ),
+    },
+    diagnosed: cases.reduce((total, item) => total + item.diagnosed, 0),
   };
 }
 

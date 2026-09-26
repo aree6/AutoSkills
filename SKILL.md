@@ -25,17 +25,18 @@ bun "$AUTOSKILL_ROOT/src/cli.ts" search "<ecosystem-or-adjacent-concept-query>"
 ```
 
 5. Treat `search` as a metadata-only discovery pass. Its candidates contain only an opaque skill id, title, and description. Do not review every candidate and do not load their full instructions merely to choose.
-6. Judge both result sets together. Deduplicate ids across the two, then select the candidate whose title and description best match the task. The two queries usually return disjoint skills, so a strong candidate is often present in only one of them.
-7. If no candidate is credible, run one more pair of two queries and judge the union again. Stop when a credible candidate is available or four queries have been used.
-8. Review only the chosen candidate:
+6. If a search returns no candidate, read its `diagnosis` before writing another query. A diagnosis that reports a load failure or a metadata gap is an upstream problem: do not rewrite the query in response to it. Only rewrite the query when the diagnosis says the catalog matched nothing.
+7. Judge both result sets together. Deduplicate ids across the two, then select the candidate whose title and description best match the task. The two queries usually return disjoint skills, so a strong candidate is often present in only one of them.
+8. If no candidate is credible, run one more pair of two queries and judge the union again. Stop when a credible candidate is available or four queries have been used.
+9. Review only the chosen candidate:
 
 ```bash
 bun "$AUTOSKILL_ROOT/src/cli.ts" review "<skill-id>"
 ```
 
-9. Read the returned `skill.skillPath` directly. The selected skill is loaded locally inside the OS temporary directory. Keep the returned `reviewId`, path, and digest available for the rest of the logical task, including plan mode, summaries, permission waits, and `continue`. If the chosen skill is not suitable, do not approve it and choose another candidate.
-10. Use only the reviewed and approved skills. When delegating, provide the mandatory skill handoff below.
-11. Do not persist a selected skill automatically. Only after explicit user approval, and only when `persistMode` is `workflow-only`, install a selected reviewed workflow:
+10. Read the returned `skill.skillPath` directly. The selected skill is loaded locally inside the OS temporary directory. Keep the returned `reviewId`, path, and digest available for the rest of the logical task, including plan mode, summaries, permission waits, and `continue`. If the chosen skill is not suitable, do not approve it and choose another candidate.
+11. Use only the reviewed and approved skills. When delegating, provide the mandatory skill handoff below.
+12. Do not persist a selected skill automatically. Only after explicit user approval, and only when `persistMode` is `workflow-only`, install a selected reviewed workflow:
 
 ```bash
 bun "$AUTOSKILL_ROOT/src/cli.ts" install "<review-id>" "<opencode|claude-code|codex>"

@@ -330,35 +330,92 @@ async function fetchSkillMetadata(
   return extractJsonLdMetadata(await response.text(), skill.name);
 }
 
-export async function search(
-  query: string,
-  controlsOverride?: Controls,
-): Promise<{
+export type Omission = {
+  unreachable: number;
+  incompleteMetadata: number;
+};
+
+export type SearchResult = {
   query: string;
   controls: Controls;
   rawCount: number;
-  omittedWithoutDescription: number;
+  inspected: number;
   candidates: DiscoveryCandidate[];
-}> {
+  omitted: Omission;
+  diagnosis: string | null;
+};
+
+export function diagnose(
+  rawCount: number,
+  inspected: number,
+  candidateCount: number,
+  omitted: Omission,
+): string | null {
+  if (candidateCount > 0) return null;
+  if (rawCount === 0) {
+    return "The catalog matched nothing for this query. Only a different query can help; repeating this wording cannot.";
+  }
+  if (inspected === 0) {
+    return "Catalog results were dropped before metadata inspection, so no candidate could be evaluated.";
+  }
+  if (omitted.unreachable === inspected) {
+    return "Every candidate page failed to load. This is a network or upstream failure, not a query problem, so do not rewrite the query in response to it.";
+  }
+  if (omitted.unreachable > 0) {
+    return "Most candidate pages failed to load. Retry the same pair once, then treat a repeated failure as an upstream problem rather than a query problem.";
+  }
+  return "Candidates were found but their public pages exposed no usable title and description. This is an upstream metadata gap, not a query problem, so do not rewrite the query in response to it.";
+}
+
+export async function search(
+  query: string,
+  controlsOverride?: Controls,
+): Promise<SearchResult> {
   const controls = controlsOverride ?? (await loadControls());
   const results = await searchCatalog(query);
   const ranked = rankSkills(results, controls);
-  const metadata = await Promise.all(
-    ranked.map((skill) => fetchSkillMetadata(skill).catch(() => null)),
+  const settled = await Promise.all(
+    ranked.map((skill) =>
+      fetchSkillMetadata(skill).then(
+        (value) => ({ value, failed: false }),
+        () => ({ value: null, failed: true }),
+      ),
+    ),
   );
-  const candidates = ranked.flatMap((skill, index) => {
-    const value = metadata[index];
-    if (!value) return [];
-    return [
-      { id: skill.id, title: value.title, description: value.description },
-    ];
-  });
+  const candidates: DiscoveryCandidate[] = [];
+  let unreachable = 0;
+  let incompleteMetadata = 0;
+  for (const [index, skill] of ranked.entries()) {
+    const outcome = settled[index]!;
+    if (outcome.failed) {
+      unreachable += 1;
+      continue;
+    }
+    const value = outcome.value;
+    if (!value) {
+      incompleteMetadata += 1;
+      continue;
+    }
+    candidates.push({
+      id: skill.id,
+      title: value.title,
+      description: value.description,
+    });
+  }
+  const omitted: Omission = { unreachable, incompleteMetadata };
   return {
     query,
     controls,
     rawCount: results.length,
-    omittedWithoutDescription: ranked.length - candidates.length,
+    inspected: ranked.length,
     candidates,
+    omitted,
+    diagnosis: diagnose(
+      results.length,
+      ranked.length,
+      candidates.length,
+      omitted,
+    ),
   };
 }
 
